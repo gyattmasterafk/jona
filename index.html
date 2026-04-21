@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>16-BIT DOOM REVAMP</title>
+  <title>DOOM: TEXTURED</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
     
@@ -9,13 +9,10 @@
     
     #game-wrapper { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
     
-    /* 16-bit chunky pixel look */
     #gameCanvas { width: 100%; height: calc(100vh - 60px); image-rendering: pixelated; display: block; }
     
-    /* Smaller Retro HUD */
     #hud { height: 60px; background: #333; border-top: 4px solid #777; border-bottom: 4px solid #111; display: flex; justify-content: space-around; align-items: center; z-index: 10; text-shadow: 2px 2px #000; font-size: 12px; box-sizing: border-box; }
     
-    /* Pixel Gun */
     #gun-box { position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); width: 180px; height: 180px; pointer-events: none; }
     #gun { width: 100%; height: 100%; }
     #muzzle-flash { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 120px; height: 120px; background: radial-gradient(circle, #ffeb3b 10%, #f44336 40%, transparent 70%); display: none; image-rendering: pixelated; }
@@ -49,11 +46,47 @@
 
 <script>
 const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
+const ctx = canvas.getContext("2d", { alpha: false });
 const ammoVal = document.getElementById("ammo-val");
 const flash = document.getElementById("muzzle-flash");
 
-// MAP: 1 = Grey Stone, 2 = Blue Brick, 3 = Red Door
+// --- PROCEDURAL TEXTURE GENERATOR ---
+function createTexture(type) {
+    const t = document.createElement('canvas');
+    t.width = 64; t.height = 64;
+    const c = t.getContext('2d');
+    
+    if (type === 1) { // 1: Mossy Stone
+        c.fillStyle = "#696a6a"; c.fillRect(0,0,64,64);
+        for(let i=0; i<800; i++) {
+            c.fillStyle = Math.random()>0.8 ? "#4a5d35" : (Math.random()>0.5?"#555":"#888");
+            c.fillRect(Math.random()*64, Math.random()*64, 2, 2);
+        }
+        c.strokeStyle = "#333"; c.strokeRect(0,0,64,64);
+    } 
+    else if (type === 2) { // 2: Blue Brick
+        c.fillStyle = "#2d3e50"; c.fillRect(0,0,64,64);
+        c.fillStyle = "#1a252f";
+        for(let y=0; y<64; y+=16) {
+            c.fillRect(0, y, 64, 2); // horizontal grout
+            for(let x=0; x<64; x+=16) {
+                let offset = (y/16)%2===0 ? 0 : 8;
+                c.fillRect(x + offset, y, 2, 16); // vertical grout
+            }
+        }
+    } 
+    else if (type === 3) { // 3: Red Vault Door
+        c.fillStyle = "#8b0000"; c.fillRect(0,0,64,64);
+        c.strokeStyle = "#400000"; c.lineWidth = 4; c.strokeRect(4,4,56,56);
+        c.fillStyle = "#daa520"; c.beginPath(); c.arc(50, 32, 5, 0, Math.PI*2); c.fill(); // doorknob
+        c.fillStyle = "#400000"; c.fillRect(30, 4, 4, 56); // middle crack
+    }
+    return t;
+}
+
+const textures = [null, createTexture(1), createTexture(2), createTexture(3)];
+
+// MAP
 const map = [
   [1,1,1,1,1,1,1,1,1,1,1,1,1],
   [1,0,0,0,0,2,0,0,0,0,0,0,1],
@@ -64,7 +97,7 @@ const map = [
   [1,1,1,1,1,1,1,1,1,1,1,1,1]
 ];
 
-let player = { x: 2.5, y: 1.5, dir: 0, speed: 0.12, rotSpeed: 0.08, ammo: 50 };
+let player = { x: 2.5, y: 1.5, dir: 0, speed: 0.1, rotSpeed: 0.08, ammo: 50 };
 const keys = {};
 
 window.onkeydown = (e) => { 
@@ -92,7 +125,6 @@ function update() {
     if (keys['w']) { nx += Math.cos(player.dir) * player.speed; ny += Math.sin(player.dir) * player.speed; }
     if (keys['s']) { nx -= Math.cos(player.dir) * player.speed; ny -= Math.sin(player.dir) * player.speed; }
     
-    // Smooth collision buffer
     if (map[Math.floor(player.y)][Math.floor(nx)] === 0) player.x = nx;
     if (map[Math.floor(ny)][Math.floor(player.x)] === 0) player.y = ny;
     
@@ -101,19 +133,20 @@ function update() {
 }
 
 function draw() {
-    // 16-bit style floor and ceiling gradients
+    // Background gradients
     for(let y = 0; y < 100; y++) {
         let c = Math.floor(y * 0.4) + 15;
-        ctx.fillStyle = `rgb(${c}, ${c}, ${c})`; // Ceiling
+        ctx.fillStyle = `rgb(${c}, ${c}, ${c})`; 
         ctx.fillRect(0, y, 320, 1);
         
-        let f = Math.floor(y * 0.7) + 20;
-        ctx.fillStyle = `rgb(${f/1.5}, ${f/2}, 0)`; // Dirt floor
+        let f = Math.floor(y * 0.6) + 20;
+        ctx.fillStyle = `rgb(${f/1.5}, ${f/2}, 0)`; 
         ctx.fillRect(0, 199 - y, 320, 1);
     }
 
-    const fov = Math.PI / 2.5;
-    const rays = 320; // 1 ray per pixel of screen width
+    // WIDER FOV (90 degrees instead of 72)
+    const fov = Math.PI / 2;
+    const rays = 320; 
     
     for (let i = 0; i < rays; i++) {
         let angle = (player.dir - fov/2) + (i/rays) * fov;
@@ -134,39 +167,30 @@ function draw() {
             if (map[mapY][mapX] > 0) {
                 hit = true;
                 
-                // Fix fisheye distortion
                 let correctedDist = dist * Math.cos(angle - player.dir);
-                let h = 200 / correctedDist;
+                // Lower height multiplier makes it feel less "zoomed in"
+                let h = 160 / correctedDist;
                 
                 let block = map[mapY][mapX];
-                let r=0, g=0, b=0;
                 
-                // Color Palette
-                if(block === 1) { r=140; g=140; b=140; } // Stone
-                else if(block === 2) { r=60; g=90; b=180; } // Blue Brick
-                else if(block === 3) { r=180; g=40; b=40; } // Red Door
-                
-                // Lighting & Corner Shadows
+                // Calculate where the ray hit the block (0.0 to 1.0)
                 let fractX = hitX - mapX;
                 let fractY = hitY - mapY;
-                let isVerticalWall = (Math.min(fractX, 1 - fractX) < Math.min(fractY, 1 - fractY));
+                let isVert = (Math.min(fractX, 1 - fractX) < Math.min(fractY, 1 - fractY));
                 
-                let shade = isVerticalWall ? 0.65 : 0.9;
-                let fog = Math.max(0.2, 1 - (dist / 12));
+                let texPos = isVert ? fractY : fractX;
+                if (isVert && rayDirX < 0) texPos = 1 - texPos;
+                if (!isVert && rayDirY > 0) texPos = 1 - texPos;
                 
-                r = Math.floor(r * shade * fog);
-                g = Math.floor(g * shade * fog);
-                b = Math.floor(b * shade * fog);
+                // Grab the exact 1-pixel wide vertical slice of our texture
+                let tX = Math.max(0, Math.min(63, Math.floor(texPos * 64)));
+                ctx.drawImage(textures[block], tX, 0, 1, 64, i, 100 - h/2, 1, h);
                 
-                // Draw wall strip
-                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                // Shadows and Fog overlay
+                let shade = isVert ? 0.4 : 0.1;
+                let fog = Math.min(1, dist / 10);
+                ctx.fillStyle = `rgba(0,0,0,${Math.min(0.85, shade + fog)})`;
                 ctx.fillRect(i, 100 - h/2, 1, h);
-                
-                // Add horizontal "texture scanlines"
-                ctx.fillStyle = "rgba(0,0,0,0.15)";
-                for(let stripe = 0; stripe < h; stripe += 6) {
-                    ctx.fillRect(i, (100 - h/2) + stripe, 1, 3);
-                }
             }
         }
     }
