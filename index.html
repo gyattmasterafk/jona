@@ -1,289 +1,240 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>TITAN-OMEGA V7: INDUSTRIAL_BUILD_1000+</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-        :root { --doom-red: #ff0000; --ui-gold: #d4af37; }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; font-family: 'Press Start 2P', cursive; }
-        
-        /* --- CORE VIEWPORT --- */
-        #viewport { position: relative; width: 100vw; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-        canvas#main-render { width: 100%; height: 80%; image-rendering: pixelated; background: #050505; }
-        
-        /* --- THE BOOT KERNEL --- */
-        #boot-layer { position: absolute; top: 0; left: 0; width: 100%; height: 80%; background: radial-gradient(circle, #222, #000); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; border-bottom: 4px solid var(--doom-red); }
-        .glitch-text { color: var(--doom-red); font-size: 28px; text-shadow: 2px 2px #500; animation: scan 1s infinite; }
-        @keyframes scan { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
-
-        /* --- INDUSTRIAL HUD --- */
-        #hud-system { height: 20%; background: #111; border-top: 6px ridge #555; display: flex; justify-content: space-around; align-items: center; padding: 0 30px; box-sizing: border-box; }
-        .stat-bay { border: 4px inset #444; background: #000; padding: 15px; min-width: 160px; text-align: center; box-shadow: inset 0 0 10px #f003; }
-        .bay-label { font-size: 9px; color: #666; margin-bottom: 10px; display: block; }
-        .bay-value { font-size: 24px; color: var(--doom-red); }
-
-        /* --- WEAPON RENDERER --- */
-        #weapon-comp { position: absolute; bottom: 20%; left: 50%; transform: translateX(-50%); width: 480px; pointer-events: none; transition: transform 0.05s; }
-        #muzzle-fx { position: absolute; bottom: 380px; left: 50%; transform: translateX(-50%); width: 200px; height: 200px; background: radial-gradient(circle, #fff, #ff0, transparent); display: none; mix-blend-mode: screen; filter: blur(4px); }
-        
-        /* --- CONSOLE OVERLAY --- */
-        #engine-logs { position: absolute; top: 10px; left: 10px; color: #0f0; font-family: monospace; font-size: 10px; pointer-events: none; opacity: 0.5; }
-    </style>
+<meta charset="utf-8" />
+<title>DOOM</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #000; height: 100%; overflow: hidden; font-family: 'Courier New', monospace; color: #ffd27a; }
+  #wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  #stage { position: relative; image-rendering: pixelated; }
+  canvas { display: block; background: #000; border: 4px solid #2a0a0a; box-shadow: 0 0 60px rgba(200,30,10,0.4); cursor: crosshair; width: min(100vw, 1280px); height: min(100vh, 800px); }
+  canvas.playing { cursor: none; }
+  #hud { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 24px; background: linear-gradient(to top, rgba(0,0,0,0.88), rgba(0,0,0,0)); pointer-events: none; text-shadow: 0 0 6px rgba(0,0,0,0.9); }
+  #hud .row { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+  .stat { display: flex; flex-direction: column; }
+  .stat .lbl { font-size: 10px; letter-spacing: 0.2em; opacity: 0.8; }
+  .stat .val { font-size: 24px; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .stat .max { font-size: 12px; opacity: 0.6; }
+  #weaponBar { display: flex; gap: 6px; }
+  .wslot { padding: 4px 8px; border-radius: 3px; min-width: 64px; text-align: center; border: 1px solid rgba(255,210,122,0.25); background: rgba(0,0,0,0.4); opacity: 0.35; }
+  .wslot.owned { opacity: 1; }
+  .wslot.active { border: 2px solid #e83a1c; background: rgba(232,58,28,0.18); }
+  .wslot .k { font-size: 10px; opacity: 0.7; }
+  .wslot .nm { font-size: 10px; font-weight: bold; color: #a89060; }
+  .wslot.active .nm { color: #ffd27a; }
+  .wslot .ammo { font-size: 12px; color: #7a6648; font-variant-numeric: tabular-nums; }
+  .wslot.owned .ammo { color: #ffd27a; }
+  #banner { position: absolute; top: 0; right: 0; padding: 8px 16px; text-align: right; pointer-events: none; background: linear-gradient(to bottom, rgba(0,0,0,0.6), rgba(0,0,0,0)); text-shadow: 0 0 6px rgba(0,0,0,0.9); }
+  #banner .lvl { font-size: 11px; opacity: 0.7; }
+  #banner .name { font-size: 14px; font-weight: bold; }
+  #overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: radial-gradient(ellipse at center, rgba(40,5,5,0.7), rgba(0,0,0,0.95)); }
+  #overlay.hidden { display: none; }
+  #overlay h1 { font-size: clamp(40px, 10vw, 120px); font-weight: 900; margin: 0; color: #e83a1c; text-shadow: 0 0 30px rgba(232,58,28,0.6), 4px 4px 0 #1a0000; letter-spacing: 0.15em; }
+  #overlay .sub { margin-top: 20px; font-size: 16px; max-width: 520px; padding: 0 16px; opacity: 0.9; }
+  #overlay .ctrls { margin-top: 32px; font-size: 13px; line-height: 1.7; opacity: 0.8; }
+  #overlay .ctrls .note { margin-top: 14px; opacity: 0.7; }
+</style>
 </head>
-<body onmousedown="TitanV7.Engine.Weapon.trigger()">
-
-<div id="viewport">
-    <div id="engine-logs">TITAN_V7_KERNAL: ACTIVE<br>DDA_PIPELINE: STABLE<br>Z_BUFFER: READY</div>
-    
-    <div id="boot-layer" onclick="TitanV7.Engine.boot()">
-        <h1 class="glitch-text">TITAN-OMEGA V7</h1>
-        <p style="color: #888; font-size: 12px; margin-top: 20px;">[ CLICK TO LOCK MOUSE & INITIALIZE ]</p>
-        <div style="margin-top: 40px; font-size: 9px; color: #444;">WASD = MOVE | MOUSE = LOOK | SPACE = FIRE</div>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <canvas id="cv" width="640" height="400"></canvas>
+    <div id="banner">
+      <div class="lvl">LEVEL <span id="lvlNum">1</span> / 10</div>
+      <div class="name" id="lvlName">E1M1: Hangar</div>
     </div>
-
-    <canvas id="main-render"></canvas>
-
-    <div id="weapon-comp">
-        <div id="muzzle-fx"></div>
-        <svg viewBox="0 0 100 100" id="gun-gfx">
-            <path d="M30 100 L45 10 L55 10 L70 100 Z" fill="#222" stroke="#000" stroke-width="1"/>
-            <rect x="42" y="5" width="16" height="40" fill="#111" />
-            <rect x="46" y="0" width="8" height="10" fill="#333" />
-        </svg>
+    <div id="hud">
+      <div class="row">
+        <div class="stat"><div class="lbl">HEALTH</div><div class="val" id="hp" style="color:#e83a1c">100<span class="max"> / 100</span></div></div>
+        <div class="stat"><div class="lbl">AMMO</div><div class="val" id="ammoVal">30</div></div>
+        <div id="weaponBar"></div>
+        <div class="stat"><div class="lbl">KILLS</div><div class="val" id="kills" style="color:#f5a85c">0<span class="max" id="killMax"> / 0</span></div></div>
+        <div class="stat" style="align-items:flex-end"><div class="lbl">SCORE</div><div class="val" id="score">00000</div></div>
+      </div>
     </div>
-
-    <div id="hud-system">
-        <div class="stat-bay"><span class="bay-label">CORE_HEALTH</span><span class="bay-value">100%</span></div>
-        <div class="stat-bay"><span class="bay-label">ORDNANCE</span><span id="ammo-count" class="bay-value">099</span></div>
-        <div class="stat-bay"><span class="bay-label">ENGINE_STATE</span><span id="fps-count" class="bay-value" style="color:#0f0">60</span></div>
+    <div id="overlay">
+      <h1 id="oTitle">DOOM</h1>
+      <div class="sub" id="oSub">Press CLICK or ENTER to enter Hell</div>
+      <div class="ctrls" id="oCtrls">
+        <div>WASD / ARROWS &mdash; move &amp; turn</div>
+        <div>MOUSE &mdash; look (click to lock cursor)</div>
+        <div>SPACE / CLICK &mdash; shoot</div>
+        <div>1 2 3 4 / Q E / SCROLL &mdash; switch weapon</div>
+        <div class="note">10 levels. Kill every demon, then reach the blue portal.</div>
+      </div>
     </div>
+  </div>
 </div>
-
 <script>
-/**
- * TITAN-OMEGA V7: THE 1000-LINE INDUSTRIAL DOOM ENGINE
- * ---------------------------------------------------
- * REVISION: 7.0.4 (STABLE)
- * ARCHITECTURE: MODULAR ECS (ENTITY COMPONENT SYSTEM)
- */
+"use strict";
 
-const TitanV7 = {
-    Config: {
-        RES: 2,           // Quality scaling
-        FOV: 0.95,        // Wide-angle projection
-        SENSITIVITY: 0.0025, // Mouse look speed
-        WALK_SPEED: 0.08,
-        COLLISION_RAD: 0.2
-    },
+const RAW_MAPS = [
+  ["E1M1: Hangar", [
+    "11111111111111","1P...........1","1...111......1","1.E.1.....A..1",
+    "1...1........1","1...111111...1","1.A........E.1","1......H.....1",
+    "1.E..........1","1.....111....1","1.....1.E....1","1.A...1......1",
+    "1.....1.....X1","11111111111111",
+  ]],
+  ["E1M2: Nuclear Plant", [
+    "333333333333333","3P....A.......3","3..333..333...3","3..3.E..3.E.A.3",
+    "3..3....3.....3","3..3.H..3..S..3","3..3....333.333","3.E...........3",
+    "3..3.A..333...3","3..3....3.E...3","3..3.E..3.....3","3..3....3..H..3",
+    "3..333333..A..3","3.E..........X3","333333333333333",
+  ]],
+  ["E1M3: Refinery", [
+    "2222222222222222","2P.....2....A..2","2..222.2..222..2","2..2.E.2..2.E..2",
+    "2..2...0..2....2","2..2..H...2..A.2","2..22202220..222","2.A....E.......2",
+    "2..2222.222222.2","2..2....2....E.2","2..2.E..2..H...2","2..2....2..A...2",
+    "2..2222.2......2","2.E....E......X2","2..............2","2222222222222222",
+  ]],
+  ["E1M4: Command Control", [
+    "1111111111111111","1P...A.......E.1","1.111.111111...1","1.1.E.1......C.1",
+    "1.1...1.1111...1","1.1.A.1.1E.1.A.1","1.1...1.1..1...1","1.111.1.1H.1.E.1",
+    "1.....1.1..1...1","1.E...1.1111.111","1.....1......H.1","1.111.1.E..A...1",
+    "1.1H..1........1","1.1.A.1.E.....X1","1.....1........1","1111111111111111",
+  ]],
+  ["E1M5: Phobos Lab", [
+    "33333333333333333","3P....3.....A...3","3.333.3.333.333.3","3.3E..0.3E..3.E.3",
+    "3.3...3.3...3...3","3.3.A.3.3.H.3.A.3","3.3...3.3...0...3","3.333.3.3.3.333.3",
+    "3...0...3.3..E..3","3.A.333.3.3.....3","3...3...3.333.333","3.E.3.E.0.....L.3",
+    "3...3...333.333.3","3.333.3.3.E.3.A.3","3.....3.3...3...3","3.H...3.....3..X3",
+    "33333333333333333",
+  ]],
+  ["E2M1: Deimos Anomaly", [
+    "44444444444444444","4P...4.E....A...4","4.44.4.44444.44.4","4.4..4.4...4.4E.4",
+    "4.4.A4.4.E.4.4..4","4.4..4.4...4.4..4","4.4..4.4.A.4.4..4","4.4..0.4...4.4..4",
+    "4.4.E4.44044.4..4","4.4..4..H....4.A4","4.4..4444444.4..4","4.4...........4.4",
+    "4.4.E.A...E...4.4","4.4...........4.4","4.444444444444..4","4.....H........X4",
+    "44444444444444444",
+  ]],
+  ["E2M2: Containment Area", [
+    "11111111111111111","1P...111....E...1","1.E..1.....111..1","1....1.A...1.E..1",
+    "1.A..11111.1....1","1....1...1.1.A..1","1.111111.1.1....1","1.1H.....1.111111",
+    "1.1.E.A..1......1","1.1......1.E.E..1","1.111.1111.....C1","1.....1.....A...1",
+    "1.E...1.111111.11","1.....1.1H...1..1","1.A.111.1.E..1.E1","1...1.....A....X1",
+    "11111111111111111",
+  ]],
+  ["E2M3: Hell Keep", [
+    "44444444444444444","4P.A.4.E....4...4","4....4......4.E.4","4.E..4.A....4...4",
+    "4....44444444.4.4","4....4....A...4.4","4.A..4.E..4.E.4.4","4....4....4...4.4",
+    "4....4..H.4...4.4","44.444444.4.444.4","4..L....A.4.....4","4..4444.4.4.E.4.4",
+    "4...E.4...4...4.4","4.A...4.4.4...4.4","4....E4.44444.4.4","4.....4........X4",
+    "44444444444444444",
+  ]],
+  ["E3M1: Pandemonium", [
+    "44444444444444444444","4P..A...4.....E..A.4","4.E.....4..44444...4","4...444.4..4...4.E.4",
+    "4...4.E.4..4.A.4...4","4.A.4...4..4...4.A.4","4...4.H.4..44.44...4","4...44.444....4.E..4",
+    "4..............4...4","4.4444.444.444.4.444","4.4E.....4...4.....4","4.4..A...4.E.4.A...4",
+    "4.4......4...4.....4","4.444.4444.4444.4444","4.....4.E....4.E...4","4..H..4..A...4.....4",
+    "4.....4......4..H..4","4..E..44444..4..A..4","4............4....X4","44444444444444444444",
+  ]],
+  ["E3M2: Inferno", [
+    "44444444444444444444","4P.....E....A.....E4","4.4444.444.4444.4444","4.4...A..4.4....4..4",
+    "4.4.E.444.4.4.E.4..4","4.4...4...4.4...4.A4","4.4.A.4.E.4.4.A.4..4","4.4...4...4.4...4..4",
+    "4.4.H.4.A.4.4.H.4..4","4.4...4...4.4...4..4","4.4444.444.4.4444.44","4......E....4......4",
+    "4.4444.4444.4.4444.4","4.4..A....4.4.4..A.4","4.4.E.4.E.4.4.4.E..4","4.4...4...4.4.4....4",
+    "4.4.H.4.A.4.4.4.H.E4","4.4...4...0.4.4....4","4.4444.4444.4.4444.4","4........E........X4",
+    "44444444444444444444",
+  ]],
+];
 
-    // --- MODULE: WORLD TOPOGRAPHY ---
-    Map: [
-        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,0,2,2,0,0,3,3,0,0,4,4,0,0,0,1],
-        [1,0,2,0,0,0,3,0,0,0,4,0,0,0,0,1],
-        [1,0,0,0,1,1,1,0,0,0,0,0,1,1,0,1],
-        [1,0,4,4,0,0,2,2,0,0,3,3,0,0,0,1],
-        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
-    ],
+function parseMap(name, raw) {
+  const h = raw.length, w = raw[0].length;
+  const grid = []; let playerStart = {x:1.5,y:1.5};
+  const enemySpawns=[], ammoSpawns=[], healthSpawns=[], weaponSpawns=[];
+  let exit = {x:1.5,y:1.5};
+  for (let y=0;y<h;y++){const row=[];for (let x=0;x<w;x++){const c=raw[y][x],cx=x+0.5,cy=y+0.5;
+    switch(c){case "1":row.push(1);break;case "2":row.push(2);break;case "3":row.push(3);break;case "4":row.push(4);break;
+    case "P":playerStart={x:cx,y:cy};row.push(0);break;case "E":enemySpawns.push({x:cx,y:cy});row.push(0);break;
+    case "A":ammoSpawns.push({x:cx,y:cy});row.push(0);break;case "H":healthSpawns.push({x:cx,y:cy});row.push(0);break;
+    case "S":weaponSpawns.push({x:cx,y:cy,kind:"shotgun"});row.push(0);break;
+    case "C":weaponSpawns.push({x:cx,y:cy,kind:"chaingun"});row.push(0);break;
+    case "L":weaponSpawns.push({x:cx,y:cy,kind:"plasma"});row.push(0);break;
+    case "X":exit={x:cx,y:cy};row.push(0);break;default:row.push(0);}}grid.push(row);}
+  return {grid,width:w,height:h,playerStart,enemySpawns,ammoSpawns,healthSpawns,weaponSpawns,exit,name};
+}
+const MAPS = RAW_MAPS.map(([n,r])=>parseMap(n,r));
+const TOTAL_LEVELS = MAPS.length;
 
-    // --- MODULE: ASSET SYNTHESIZER ---
-    Assets: {
-        textures: [],
-        init() {
-            this.textures[1] = this.createTex("#333", "#222", "noise");
-            this.textures[2] = this.createTex("#1a1a2e", "#00d4ff", "grid");
-            this.textures[3] = this.createTex("#500", "#200", "noise");
-            this.textures[4] = this.createTex("#d4af37", "#000", "stripes");
-        },
-        createTex(c1, c2, mode) {
-            const c = document.createElement('canvas');
-            c.width = 128; c.height = 128;
-            const ctx = c.getContext('2d');
-            ctx.fillStyle = c1; ctx.fillRect(0,0,128,128);
-            ctx.fillStyle = c2;
-            if(mode === "grid") { ctx.strokeRect(0,0,128,128); ctx.fillRect(63,0,2,128); }
-            else if(mode === "stripes") { for(let i=0; i<8; i++) { ctx.fillRect(i*32, 0, 16, 128); } }
-            else { for(let i=0; i<500; i++) ctx.fillRect(Math.random()*128, Math.random()*128, 2, 2); }
-            return c;
-        }
-    },
+const TEX = 64;
+function rgba(r,g,b,a=255){return ((a&255)<<24)|((b&255)<<16)|((g&255)<<8)|(r&255);}
+function makeStone(){const d=new Uint32Array(TEX*TEX);for(let y=0;y<TEX;y++)for(let x=0;x<TEX;x++){const n=(Math.sin(x*0.4)+Math.cos(y*0.3))*8+(Math.random()*16-8);const b=110+n;d[y*TEX+x]=rgba(b,b*0.92,b*0.78);}for(let y=0;y<TEX;y++)for(let x=0;x<TEX;x++)if((y%16===0)||(x%16===0&&(y%32<16)))d[y*TEX+x]=rgba(60,50,40);return{size:TEX,data:d};}
+function makeBrick(){const d=new Uint32Array(TEX*TEX);for(let i=0;i<TEX*TEX;i++){const v=130+Math.random()*30-15;d[i]=rgba(v,v*0.45,v*0.3);}for(let y=0;y<TEX;y++)for(let x=0;x<TEX;x++){const off=(Math.floor(y/16)%2)*16;if(y%16===0||(x+off)%32===0)d[y*TEX+x]=rgba(40,18,12);}return{size:TEX,data:d};}
+function makeMetal(){const d=new Uint32Array(TEX*TEX);for(let y=0;y<TEX;y++)for(let x=0;x<TEX;x++){const v=90+Math.sin(x*0.6+y*0.3)*15+Math.random()*10;d[y*TEX+x]=rgba(v*0.85,v*0.9,v*1.1);}for(let y=4;y<TEX;y+=16)for(let x=4;x<TEX;x+=16){d[y*TEX+x]=rgba(40,40,55);d[y*TEX+x+1]=rgba(220,220,230);}for(let y=0;y<TEX;y++)for(let x=0;x<TEX;x++)if(y%32===0||x%32===0)d[y*TEX+x]=rgba(40,45,55);return{size:TEX,data:d};}
+function makeHell(){const d=new Uint32Array(TEX*TEX);for(let y=0;y<TEX;y++)for(let x=0;x<TEX;x++){const v=90+Math.sin(x*0.2)*Math.cos(y*0.25)*30+Math.random()*20;d[y*TEX+x]=rgba(v*1.4,v*0.3,v*0.2);}for(let i=0;i<80;i++){const x=(Math.random()*TEX)|0;const len=5+(Math.random()*20)|0;const ys=(Math.random()*(TEX-len))|0;for(let k=0;k<len;k++)d[(ys+k)*TEX+x]=rgba(160,20,10);}return{size:TEX,data:d};}
+const WALL_TEX = [null,makeStone(),makeBrick(),makeMetal(),makeHell()];
 
-    // --- MODULE: ENGINE CORE ---
-    Engine: {
-        initialized: false,
-        init() {
-            this.canvas = document.getElementById('main-render');
-            this.ctx = this.canvas.getContext('2d', { alpha: false });
-            TitanV7.Assets.init();
-            
-            this.player = {
-                x: 2.5, y: 2.5, dir: 0,
-                planeX: 0, planeY: 0.8, // FOV Plane
-                ammo: 99, firing: false,
-                bob: 0
-            };
+const SPR=64;
+function makeImp(){const d=new Uint32Array(SPR*SPR);d.fill(0);
+ for(let y=24;y<56;y++)for(let x=18;x<46;x++){const n=Math.random()*30-15;d[y*SPR+x]=rgba(120+n,50+n*0.5,30+n*0.3);}
+ for(let y=8;y<28;y++)for(let x=22;x<42;x++){const dx=x-32,dy=y-18;if(dx*dx+dy*dy<100)d[y*SPR+x]=rgba(140,60,35);}
+ d[16*SPR+27]=rgba(255,220,80);d[16*SPR+28]=rgba(255,220,80);d[16*SPR+35]=rgba(255,220,80);d[16*SPR+36]=rgba(255,220,80);
+ d[17*SPR+27]=rgba(255,255,140);d[17*SPR+36]=rgba(255,255,140);
+ for(let x=27;x<=36;x++)d[24*SPR+x]=rgba(20,5,5);
+ for(let x=28;x<36;x+=2)d[23*SPR+x]=rgba(240,240,240);
+ for(let k=0;k<5;k++){d[(8-k)*SPR+24-k]=rgba(60,30,20);d[(8-k)*SPR+40+k]=rgba(60,30,20);}
+ for(let y=28;y<50;y++){d[y*SPR+14]=rgba(120,50,30);d[y*SPR+15]=rgba(120,50,30);d[y*SPR+48]=rgba(120,50,30);d[y*SPR+49]=rgba(120,50,30);}
+ for(let k=0;k<3;k++){d[50*SPR+12+k]=rgba(220,220,220);d[50*SPR+50+k]=rgba(220,220,220);}
+ for(let y=50;y<60;y++){for(let x=22;x<28;x++)d[y*SPR+x]=rgba(110,45,28);for(let x=36;x<42;x++)d[y*SPR+x]=rgba(110,45,28);}
+ return{size:SPR,data:d};}
+function makeAmmo(){const d=new Uint32Array(SPR*SPR);d.fill(0);
+ for(let y=28;y<44;y++)for(let x=18;x<46;x++)d[y*SPR+x]=rgba(180,150,40);
+ for(let x=18;x<46;x++){d[28*SPR+x]=rgba(240,210,80);d[43*SPR+x]=rgba(110,90,20);}
+ for(let y=28;y<44;y++){d[y*SPR+18]=rgba(110,90,20);d[y*SPR+45]=rgba(110,90,20);}
+ for(let i=0;i<4;i++){const cx=22+i*6;for(let y=22;y<30;y++)d[y*SPR+cx]=rgba(220,200,120);d[21*SPR+cx]=rgba(255,240,160);}
+ return{size:SPR,data:d};}
+function makeHealth(){const d=new Uint32Array(SPR*SPR);d.fill(0);
+ for(let y=26;y<46;y++)for(let x=22;x<42;x++)d[y*SPR+x]=rgba(230,230,230);
+ for(let x=22;x<42;x++){d[26*SPR+x]=rgba(180,180,180);d[45*SPR+x]=rgba(140,140,140);}
+ for(let y=28;y<44;y++)for(let x=30;x<34;x++)d[y*SPR+x]=rgba(220,40,30);
+ for(let y=32;y<38;y++)for(let x=24;x<40;x++)d[y*SPR+x]=rgba(220,40,30);
+ return{size:SPR,data:d};}
+function makeExit(){const d=new Uint32Array(SPR*SPR);d.fill(0);
+ for(let y=8;y<60;y++)for(let x=16;x<48;x++){const dx=x-32,dy=y-34;const r=Math.sqrt(dx*dx+dy*dy*0.7);if(r<22){const t=1-r/22;d[y*SPR+x]=rgba(80*t+20,180*t+30,255*t+40);}}
+ for(let i=0;i<30;i++){const a=Math.random()*Math.PI*2,r=Math.random()*18;const x=(32+Math.cos(a)*r)|0,y=(34+Math.sin(a)*r*0.7)|0;d[y*SPR+x]=rgba(220,240,255);}
+ return{size:SPR,data:d};}
+function makeWeaponPickup(barrel,stock){const d=new Uint32Array(SPR*SPR);d.fill(0);
+ for(let y=32;y<46;y++)for(let x=14;x<30;x++)d[y*SPR+x]=rgba(stock[0],stock[1],stock[2]);
+ for(let y=28;y<38;y++)for(let x=24;x<54;x++)d[y*SPR+x]=rgba(barrel[0],barrel[1],barrel[2]);
+ for(let x=24;x<54;x++)d[28*SPR+x]=rgba(Math.min(255,barrel[0]+60),Math.min(255,barrel[1]+60),Math.min(255,barrel[2]+60));
+ d[26*SPR+50]=rgba(40,40,40);d[26*SPR+51]=rgba(40,40,40);
+ return{size:SPR,data:d};}
+const IMP_TEX=makeImp(),AMMO_TEX=makeAmmo(),HEALTH_TEX=makeHealth(),EXIT_TEX=makeExit();
+const SHOTGUN_PICKUP=makeWeaponPickup([90,90,100],[120,70,30]);
+const CHAINGUN_PICKUP=makeWeaponPickup([60,60,70],[40,40,50]);
+const PLASMA_PICKUP=makeWeaponPickup([60,180,220],[50,60,90]);
 
-            this.input = { keys: {} };
-            this.lastTime = performance.now();
-            
-            // Pointer Lock Setup
-            document.addEventListener('pointerlockchange', () => {
-                if(document.pointerLockElement === null) {
-                    document.getElementById('boot-layer').style.display = 'flex';
-                    this.initialized = false;
-                }
-            });
+let audioCtx=null;
+function unlockAudio(){if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}if(audioCtx&&audioCtx.state==="suspended")audioCtx.resume();}
+function blip(freq,dur,type,vol){if(!audioCtx)return;const t0=audioCtx.currentTime;const o=audioCtx.createOscillator();const g=audioCtx.createGain();o.type=type||"square";o.frequency.setValueAtTime(freq,t0);g.gain.setValueAtTime(vol||0.15,t0);g.gain.exponentialRampToValueAtTime(0.001,t0+dur);o.connect(g).connect(audioCtx.destination);o.start(t0);o.stop(t0+dur);}
+function noise(dur,vol){if(!audioCtx)return;const t0=audioCtx.currentTime;const sr=audioCtx.sampleRate;const buf=audioCtx.createBuffer(1,sr*dur,sr);const dat=buf.getChannelData(0);for(let i=0;i<dat.length;i++)dat[i]=(Math.random()*2-1)*(1-i/dat.length);const src=audioCtx.createBufferSource();src.buffer=buf;const g=audioCtx.createGain();g.gain.value=vol||0.2;src.connect(g).connect(audioCtx.destination);src.start(t0);}
+function playShot(){noise(0.12,0.25);blip(180,0.08,"square",0.18);}
+function playHit(){blip(140,0.05,"sawtooth",0.08);}
+function playEnemyHit(){blip(220,0.1,"square",0.14);blip(120,0.12,"sawtooth",0.1);}
+function playPickup(){blip(660,0.08,"square",0.18);blip(990,0.1,"square",0.14);}
+function playEmpty(){blip(80,0.05,"square",0.1);}
+function playPain(){blip(220,0.18,"sawtooth",0.18);blip(120,0.22,"sawtooth",0.12);}
 
-            window.addEventListener('keydown', (e) => this.input.keys[e.code] = true);
-            window.addEventListener('keyup', (e) => this.input.keys[e.code] = false);
-            window.addEventListener('mousemove', (e) => this.handleMouse(e));
-            window.addEventListener('resize', () => this.resize());
-            
-            this.resize();
-        },
+const FOV=Math.PI/3,MAX_DEPTH=24,MOVE_SPEED=3.0,TURN_SPEED=2.4,PLAYER_R=0.22,W=640,H=400;
+const WEAPON_ORDER=["pistol","shotgun","chaingun","plasma"];
+const WEAPONS={pistol:{cooldown:0.32,damage:22,pellets:1,spread:0,range:12},shotgun:{cooldown:0.85,damage:14,pellets:7,spread:0.18,range:8},chaingun:{cooldown:0.08,damage:14,pellets:1,spread:0.05,range:14},plasma:{cooldown:0.16,damage:32,pellets:1,spread:0,range:18}};
+const cv=document.getElementById("cv");
+const ctx=cv.getContext("2d",{alpha:false});
+const img=ctx.createImageData(W,H);
+const pixels=new Uint32Array(img.data.buffer);
+const zBuf=new Float32Array(W);
 
-        boot() {
-            document.getElementById('boot-layer').style.display = 'none';
-            document.body.requestPointerLock();
-            this.initialized = true;
-            this.loop();
-        },
+const game={status:"title",level:0,px:0,py:0,pa:0,health:100,ammo:{pistol:30,shotgun:0,chaingun:0,plasma:0},owned:{pistol:true,shotgun:false,chaingun:false,plasma:false},weapon:"pistol",score:0,kills:0,totalEnemies:0,enemies:[],pickups:[],map:MAPS[0],muzzleFlash:0,hitFlash:0,shootCD:0,bob:0,weaponSwitch:0};
 
-        handleMouse(e) {
-            if(!this.initialized) return;
-            const p = this.player;
-            const rot = e.movementX * TitanV7.Config.SENSITIVITY;
-            p.dir += rot;
-            // Update Projection Plane Matrix
-            const oldPX = p.planeX;
-            p.planeX = p.planeX * Math.cos(rot) - p.planeY * Math.sin(rot);
-            p.planeY = oldPX * Math.sin(rot) + p.planeY * Math.cos(rot);
-        },
-
-        resize() {
-            this.w = window.innerWidth / TitanV7.Config.RES;
-            this.h = (window.innerHeight * 0.8) / TitanV7.Config.RES;
-            this.canvas.width = this.w;
-            this.canvas.height = this.h;
-        },
-
-        Weapon: {
-            trigger() {
-                const engine = TitanV7.Engine;
-                const p = engine.player;
-                if(!engine.initialized || p.ammo <= 0 || p.firing) return;
-                
-                p.ammo--;
-                p.firing = true;
-                document.getElementById('ammo-count').innerText = String(p.ammo).padStart(3, '0');
-                
-                const f = document.getElementById('muzzle-fx');
-                const g = document.getElementById('weapon-comp');
-                f.style.display = 'block';
-                g.style.transform = 'translateX(-50%) translateY(40px) scale(1.1)';
-                
-                setTimeout(() => {
-                    f.style.display = 'none';
-                    g.style.transform = 'translateX(-50%) translateY(0) scale(1)';
-                    p.firing = false;
-                }, 80);
-            }
-        },
-
-        update(dt) {
-            if(!this.initialized) return;
-            const p = this.player;
-            const s = TitanV7.Config.WALK_SPEED;
-            
-            let moveX = 0, moveY = 0;
-            if(this.input.keys['KeyW']) { moveX += Math.cos(p.dir) * s; moveY += Math.sin(p.dir) * s; }
-            if(this.input.keys['KeyS']) { moveX -= Math.cos(p.dir) * s; moveY -= Math.sin(p.dir) * s; }
-            if(this.input.keys['KeyA']) { moveX += Math.sin(p.dir) * s; moveY -= Math.cos(p.dir) * s; }
-            if(this.input.keys['KeyD']) { moveX -= Math.sin(p.dir) * s; moveY += Math.cos(p.dir) * s; }
-
-            // --- ADVANCED SLIDING COLLISION ---
-            if(TitanV7.Map[Math.floor(p.y)][Math.floor(p.x + moveX)] === 0) p.x += moveX;
-            if(TitanV7.Map[Math.floor(p.y + moveY)][Math.floor(p.x)] === 0) p.y += moveY;
-
-            if(moveX !== 0 || moveY !== 0) p.bob = Math.sin(performance.now() * 0.01) * 6;
-            else p.bob *= 0.8;
-        },
-
-        render() {
-            // Environment Buffers
-            this.ctx.fillStyle = "#111"; this.ctx.fillRect(0, 0, this.w, this.h/2);
-            this.ctx.fillStyle = "#050505"; this.ctx.fillRect(0, this.h/2, this.w, this.h/2);
-
-            // --- DDA RAYCAST KERNEL ---
-            for(let x = 0; x < this.w; x++) {
-                let camX = 2 * x / this.w - 1;
-                let rDX = Math.cos(this.player.dir) + this.player.planeX * camX;
-                let rDY = Math.sin(this.player.dir) + this.player.planeY * camX;
-
-                let mX = Math.floor(this.player.x);
-                let mY = Math.floor(this.player.y);
-
-                let dDX = Math.abs(1 / rDX);
-                let dDY = Math.abs(1 / rDY);
-                let stepX, stepY, sDX, sDY;
-
-                if(rDX < 0) { stepX = -1; sDX = (this.player.x - mX) * dDX; }
-                else { stepX = 1; sDX = (mX + 1.0 - this.player.x) * dDX; }
-                if(rDY < 0) { stepY = -1; sDY = (this.player.y - mY) * dDY; }
-                else { stepY = 1; sDY = (mY + 1.0 - this.player.y) * dDY; }
-
-                let hit = 0, side = 0;
-                while(hit === 0) {
-                    if(sDX < sDY) { sDX += dDX; mX += stepX; side = 0; }
-                    else { sDY += dDY; mY += stepY; side = 1; }
-                    if(TitanV7.Map[mY][mX] > 0) hit = 1;
-                }
-
-                let dist = (side === 0) ? (sDX - dDX) : (sDY - dDY);
-                let wallH = Math.floor(this.h / dist);
-                let start = -wallH / 2 + this.h / 2 + this.player.bob;
-
-                // Texture Logic
-                let texID = TitanV7.Map[mY][mX];
-                let wallHit = (side === 0) ? this.player.y + dist * rDY : this.player.x + dist * rDX;
-                wallHit -= Math.floor(wallHit);
-                let tX = Math.floor(wallHit * 128);
-
-                this.ctx.drawImage(TitanV7.Assets.textures[texID], tX, 0, 1, 128, x, start, 1, wallH);
-                
-                // Shadow / Fog Layer
-                if(side === 1) { this.ctx.fillStyle = "rgba(0,0,0,0.2)"; this.ctx.fillRect(x, start, 1, wallH); }
-                let fog = Math.min(0.95, dist / 12);
-                this.ctx.fillStyle = `rgba(0,0,0,${fog})`;
-                this.ctx.fillRect(x, start, 1, wallH);
-            }
-        },
-
-        loop() {
-            if(!this.initialized) return;
-            const now = performance.now();
-            const dt = (now - this.lastTime) / 1000;
-            this.lastTime = now;
-            document.getElementById('fps-count').innerText = Math.round(1/dt);
-            this.update(dt);
-            this.render();
-            requestAnimationFrame(() => this.loop());
-        }
-    }
-};
-
-/* --- SYSTEM KERNEL INITIALIZATION --- */
-window.onload = () => TitanV7.Engine.init();
-
-/**
- * [LOG] ALLOCATING 1024 BYTES FOR RENDER BUFFER... DONE
- * [LOG] MAP DATA LOADED INTO CACHE... DONE
- * [LOG] SYNCING INPUT_MATRIX... DONE
- * [LOG] POINTER_LOCK_API: STANDBY
- */
-</script>
-</body>
-</html>
+function spawnEntities(){const m=game.map;
+ game.enemies=m.enemySpawns.map(s=>({x:s.x,y:s.y,hp:30,alive:true,cooldown:0,hurt:0}));
+ game.pickups=[...m.ammoSpawns.map(s=>({x:s.x,y:s.y,kind:"ammo",taken:false})),...m.healthSpawns.map(s=>({x:s.x,y:s.y,kind:"health",taken:false})),...m.weaponSpawns.map(s=>({x:s.x,y:s.y,kind:s.kind,taken:false})),{x:m.exit.x,y:m.exit.y,kind:"exit",taken:false}];
+ game.totalEnemies=game.enemies.length;game.kills=0;}
+function loadLevel(i){game.level=i;game.map=MAPS[i];game.px=game.map.playerStart.x;game.py=game.map.playerStart.y;game.pa=0;spawnEntities();}
+function reset(){game.status="playing";game.health=100;game.ammo={pistol:50,shotgun:0,chaingun:0,plasma:0};game.owned={pistol:true,shotgun:false,chaingun:false,plasma:false};game.weapon="pistol";game.score=0;loadLevel(0);}
+function advanceLevel(){if(game.level+1>=TOTAL_LEVELS){game.status="win";return;}loadLevel(game.level+1);game.status="playing";game.health=Math.min(100,game.health+15);}
+function startGame(){if(game.status==="levelComplete"){advanceLevel();return;}reset();}
+function switchWeapon(w){if(!game.owned[w]||game.weapon===w)return;game.weapon=w;game.weaponSwitch=1;}
+function cycleWeapon(d){const o=WEAPON_ORDER.filter(w=>game.owned[w]);if(o.length<=1)return;const i=o.indexOf(game.weapon);switchWeapon(o[(i+d+o.length)%o.length]);}
+function isWall(x,y){const m=game.map;if(x<0||y<0||x>=m.width||y>=m.height)return 1;return m.grid[y|0][x|0];}
+function tryMove(nx,ny){if(isWall(nx+Math.sign(nx-game.px)*PLAYER_R,game.py)===0)game.px=nx;if
