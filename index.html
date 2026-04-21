@@ -1,46 +1,36 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>DOOM: TEXTURED</title>
+  <title>DOOM: WIDE & STEADY</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-    
     body { margin: 0; background: #000; overflow: hidden; font-family: 'Press Start 2P', monospace; color: white; user-select: none; }
-    
     #game-wrapper { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
-    
     #gameCanvas { width: 100%; height: calc(100vh - 60px); image-rendering: pixelated; display: block; }
-    
-    #hud { height: 60px; background: #333; border-top: 4px solid #777; border-bottom: 4px solid #111; display: flex; justify-content: space-around; align-items: center; z-index: 10; text-shadow: 2px 2px #000; font-size: 12px; box-sizing: border-box; }
-    
-    #gun-box { position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); width: 180px; height: 180px; pointer-events: none; }
+    #hud { height: 60px; background: #222; border-top: 4px solid #444; display: flex; justify-content: space-around; align-items: center; z-index: 10; font-size: 12px; }
+    #gun-box { position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); width: 220px; height: 220px; pointer-events: none; }
     #gun { width: 100%; height: 100%; }
-    #muzzle-flash { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 120px; height: 120px; background: radial-gradient(circle, #ffeb3b 10%, #f44336 40%, transparent 70%); display: none; image-rendering: pixelated; }
-
-    #instr { position: absolute; top: 10px; left: 10px; font-size: 10px; color: #fff; text-shadow: 2px 2px #000; z-index: 20;}
+    #muzzle-flash { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 120px; height: 120px; background: radial-gradient(circle, #fff 10%, #ff0 40%, transparent 70%); display: none; }
   </style>
 </head>
 <body onmousedown="shoot()">
 
   <div id="game-wrapper">
-    <div id="instr">WASD: MOVE | CLICK: FIRE</div>
-    
     <canvas id="gameCanvas" width="320" height="200"></canvas>
     
     <div id="gun-box">
         <div id="muzzle-flash"></div>
         <svg id="gun" viewBox="0 0 64 64" preserveAspectRatio="xMidYMax meet">
-            <rect x="26" y="20" width="12" height="44" fill="#555" />
-            <rect x="28" y="20" width="4" height="44" fill="#777" />
-            <rect x="24" y="16" width="16" height="6" fill="#222" />
-            <rect x="20" y="50" width="24" height="14" fill="#6d4c41" />
+            <rect x="26" y="20" width="12" height="44" fill="#444" />
+            <rect x="24" y="16" width="16" height="6" fill="#111" />
+            <rect x="20" y="50" width="24" height="14" fill="#4d3c31" />
         </svg>
     </div>
 
     <div id="hud">
-        <div>HP:<span style="color:#4caf50">100</span></div>
-        <div>AMMO:<span id="ammo-val" style="color:#ffeb3b">50</span></div>
-        <div>LVL:<span style="color:#ff9800">1</span></div>
+        <div>HP:100</div>
+        <div>AMMO:<span id="ammo-val">50</span></div>
+        <div style="color: #666; font-size: 8px;">FOV: 110&deg;</div>
     </div>
   </div>
 
@@ -50,60 +40,49 @@ const ctx = canvas.getContext("2d", { alpha: false });
 const ammoVal = document.getElementById("ammo-val");
 const flash = document.getElementById("muzzle-flash");
 
-// --- PROCEDURAL TEXTURE GENERATOR ---
-function createTexture(type) {
+// TEXTURE GENERATOR
+function createTexture(color, altColor, pattern) {
     const t = document.createElement('canvas');
     t.width = 64; t.height = 64;
     const c = t.getContext('2d');
-    
-    if (type === 1) { // 1: Mossy Stone
-        c.fillStyle = "#696a6a"; c.fillRect(0,0,64,64);
-        for(let i=0; i<800; i++) {
-            c.fillStyle = Math.random()>0.8 ? "#4a5d35" : (Math.random()>0.5?"#555":"#888");
-            c.fillRect(Math.random()*64, Math.random()*64, 2, 2);
-        }
-        c.strokeStyle = "#333"; c.strokeRect(0,0,64,64);
-    } 
-    else if (type === 2) { // 2: Blue Brick
-        c.fillStyle = "#2d3e50"; c.fillRect(0,0,64,64);
-        c.fillStyle = "#1a252f";
+    c.fillStyle = color; c.fillRect(0,0,64,64);
+    c.fillStyle = altColor;
+    if(pattern === 'brick') {
         for(let y=0; y<64; y+=16) {
-            c.fillRect(0, y, 64, 2); // horizontal grout
+            c.fillRect(0, y, 64, 2);
             for(let x=0; x<64; x+=16) {
                 let offset = (y/16)%2===0 ? 0 : 8;
-                c.fillRect(x + offset, y, 2, 16); // vertical grout
+                c.fillRect(x + offset, y, 2, 16);
             }
         }
-    } 
-    else if (type === 3) { // 3: Red Vault Door
-        c.fillStyle = "#8b0000"; c.fillRect(0,0,64,64);
-        c.strokeStyle = "#400000"; c.lineWidth = 4; c.strokeRect(4,4,56,56);
-        c.fillStyle = "#daa520"; c.beginPath(); c.arc(50, 32, 5, 0, Math.PI*2); c.fill(); // doorknob
-        c.fillStyle = "#400000"; c.fillRect(30, 4, 4, 56); // middle crack
+    } else {
+        for(let i=0; i<400; i++) c.fillRect(Math.random()*64, Math.random()*64, 2, 2);
     }
     return t;
 }
 
-const textures = [null, createTexture(1), createTexture(2), createTexture(3)];
-
-// MAP
-const map = [
-  [1,1,1,1,1,1,1,1,1,1,1,1,1],
-  [1,0,0,0,0,2,0,0,0,0,0,0,1],
-  [1,0,1,1,0,2,0,1,1,3,1,0,1],
-  [1,0,1,0,0,0,0,0,0,0,1,0,1],
-  [1,0,2,0,0,2,2,0,2,0,1,0,1],
-  [1,0,0,0,0,0,0,0,2,0,0,0,1],
-  [1,1,1,1,1,1,1,1,1,1,1,1,1]
+const textures = [null, 
+    createTexture("#555", "#777", "noise"), // 1: Stone
+    createTexture("#203040", "#101520", "brick"), // 2: Blue Brick
+    createTexture("#600", "#300", "brick") // 3: Red Wall
 ];
 
-let player = { x: 2.5, y: 1.5, dir: 0, speed: 0.1, rotSpeed: 0.08, ammo: 50 };
+const map = [
+  [1,1,1,1,1,1,1,1,1,1,1],
+  [1,0,0,0,0,0,0,0,0,0,1],
+  [1,0,2,2,0,3,0,2,2,0,1],
+  [1,0,0,0,0,0,0,0,0,0,1],
+  [1,0,2,2,0,3,0,2,2,0,1],
+  [1,0,0,0,0,0,0,0,0,0,1],
+  [1,1,1,1,1,1,1,1,1,1,1]
+];
+
+// --- SPEED ADJUSTMENT ---
+// Dropped speed from 0.1 to 0.04 for better control
+let player = { x: 2.5, y: 1.5, dir: 0, speed: 0.04, rotSpeed: 0.05, ammo: 50 };
 const keys = {};
 
-window.onkeydown = (e) => { 
-    keys[e.key.toLowerCase()] = true; 
-    if(e.code === "Space") shoot(); 
-};
+window.onkeydown = (e) => { keys[e.key.toLowerCase()] = true; if(e.code === "Space") shoot(); };
 window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
 
 function shoot() {
@@ -111,85 +90,54 @@ function shoot() {
         player.ammo--;
         ammoVal.innerText = player.ammo;
         flash.style.display = "block";
-        document.getElementById("gun").style.transform = "translateY(12px)";
-        setTimeout(() => {
-            flash.style.display = "none";
-            document.getElementById("gun").style.transform = "translateY(0)";
-        }, 80);
+        document.getElementById("gun").style.transform = "translateY(15px)";
+        setTimeout(() => { flash.style.display = "none"; document.getElementById("gun").style.transform = "translateY(0)"; }, 70);
     }
 }
 
 function update() {
-    let nx = player.x;
-    let ny = player.y;
+    let nx = player.x, ny = player.y;
     if (keys['w']) { nx += Math.cos(player.dir) * player.speed; ny += Math.sin(player.dir) * player.speed; }
     if (keys['s']) { nx -= Math.cos(player.dir) * player.speed; ny -= Math.sin(player.dir) * player.speed; }
-    
-    if (map[Math.floor(player.y)][Math.floor(nx)] === 0) player.x = nx;
-    if (map[Math.floor(ny)][Math.floor(player.x)] === 0) player.y = ny;
-    
+    if (map[Math.floor(ny)][Math.floor(nx)] === 0) { player.x = nx; player.y = ny; }
     if (keys['a']) player.dir -= player.rotSpeed;
     if (keys['d']) player.dir += player.rotSpeed;
 }
 
 function draw() {
-    // Background gradients
-    for(let y = 0; y < 100; y++) {
-        let c = Math.floor(y * 0.4) + 15;
-        ctx.fillStyle = `rgb(${c}, ${c}, ${c})`; 
-        ctx.fillRect(0, y, 320, 1);
-        
-        let f = Math.floor(y * 0.6) + 20;
-        ctx.fillStyle = `rgb(${f/1.5}, ${f/2}, 0)`; 
-        ctx.fillRect(0, 199 - y, 320, 1);
-    }
+    // Floor/Ceiling
+    ctx.fillStyle = "#111"; ctx.fillRect(0,0,320,100);
+    ctx.fillStyle = "#221100"; ctx.fillRect(0,100,320,100);
 
-    // WIDER FOV (90 degrees instead of 72)
-    const fov = Math.PI / 2;
+    // --- FOV ADJUSTMENT ---
+    // Using 1.9 radians (approx 110 degrees) for a super-wide look
+    const fov = 1.9; 
     const rays = 320; 
     
     for (let i = 0; i < rays; i++) {
         let angle = (player.dir - fov/2) + (i/rays) * fov;
-        let dist = 0;
-        let hit = false;
-        
-        let rayDirX = Math.cos(angle);
-        let rayDirY = Math.sin(angle);
+        let dist = 0, hit = false;
+        let rayX = Math.cos(angle), rayY = Math.sin(angle);
         
         while (dist < 16 && !hit) {
-            dist += 0.05;
-            let hitX = player.x + rayDirX * dist;
-            let hitY = player.y + rayDirY * dist;
+            dist += 0.04;
+            let mx = Math.floor(player.x + rayX * dist);
+            let my = Math.floor(player.y + rayY * dist);
             
-            let mapX = Math.floor(hitX);
-            let mapY = Math.floor(hitY);
-            
-            if (map[mapY][mapX] > 0) {
+            if (map[my][mx] > 0) {
                 hit = true;
-                
                 let correctedDist = dist * Math.cos(angle - player.dir);
-                // Lower height multiplier makes it feel less "zoomed in"
-                let h = 160 / correctedDist;
+                let h = 120 / correctedDist; // Lowered height for wide feel
                 
-                let block = map[mapY][mapX];
+                let block = map[my][mx];
+                let hitX = player.x + rayX * dist;
+                let hitY = player.y + rayY * dist;
+                let texX = Math.floor(((hitX % 1) + (hitY % 1)) * 64) % 64;
+
+                ctx.drawImage(textures[block], texX, 0, 1, 64, i, 100 - h/2, 1, h);
                 
-                // Calculate where the ray hit the block (0.0 to 1.0)
-                let fractX = hitX - mapX;
-                let fractY = hitY - mapY;
-                let isVert = (Math.min(fractX, 1 - fractX) < Math.min(fractY, 1 - fractY));
-                
-                let texPos = isVert ? fractY : fractX;
-                if (isVert && rayDirX < 0) texPos = 1 - texPos;
-                if (!isVert && rayDirY > 0) texPos = 1 - texPos;
-                
-                // Grab the exact 1-pixel wide vertical slice of our texture
-                let tX = Math.max(0, Math.min(63, Math.floor(texPos * 64)));
-                ctx.drawImage(textures[block], tX, 0, 1, 64, i, 100 - h/2, 1, h);
-                
-                // Shadows and Fog overlay
-                let shade = isVert ? 0.4 : 0.1;
-                let fog = Math.min(1, dist / 10);
-                ctx.fillStyle = `rgba(0,0,0,${Math.min(0.85, shade + fog)})`;
+                // Depth Shading
+                ctx.fillStyle = `rgba(0,0,0,${Math.min(0.8, dist/12)})`;
                 ctx.fillRect(i, 100 - h/2, 1, h);
             }
         }
