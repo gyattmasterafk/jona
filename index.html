@@ -1,43 +1,51 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>DOOM: BIG & ARMED</title>
+  <title>DOOM FIXED</title>
   <style>
-    body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
-    /* Bigger Canvas */
-    #container { position: relative; width: 100vw; height: 100vh; display: flex; flex-direction: column; }
-    canvas { width: 100%; height: calc(100vh - 80px); image-rendering: pixelated; background: #111; }
+    body { margin: 0; background: #000; overflow: hidden; font-family: monospace; color: white; }
     
-    #hud { height: 80px; background: #222; color: #f00; display: flex; justify-content: space-around; align-items: center; border-top: 4px solid #444; font-size: 24px; text-shadow: 2px 2px #000; }
+    /* Layout */
+    #game-wrapper { position: relative; width: 100vw; height: 100vh; display: flex; flex-direction: column; }
     
-    /* Gun & Muzzle Flash */
-    #gun-container { position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); width: 300px; pointer-events: none; }
-    #gun { width: 100%; transition: transform 0.05s; }
-    #flash { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); width: 100px; height: 100px; background: radial-gradient(circle, white, yellow, transparent); display: none; opacity: 0.8; }
+    /* The 3D View - Forced to stay in its lane */
+    #gameCanvas { width: 100%; height: 70%; background: #111; image-rendering: pixelated; display: block; }
     
-    #crosshair { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); color: lime; font-size: 24px; pointer-events: none; }
-    #minimap { position: absolute; top: 20px; right: 20px; border: 2px solid #f00; background: rgba(0,0,0,0.8); }
+    /* The HUD / Control Panel */
+    #hud { height: 30%; background: #222; border-top: 4px solid #444; display: flex; justify-content: space-around; align-items: center; z-index: 10; }
+    
+    /* Minimap - Small and locked to the corner */
+    #minimap { position: absolute; top: 10px; right: 10px; border: 2px solid #f00; width: 100px; height: 100px; background: #000; }
+
+    /* Gun Styling */
+    #gun-box { position: absolute; bottom: 30%; left: 50%; transform: translateX(-50%); width: 200px; pointer-events: none; }
+    #gun { width: 100%; height: auto; fill: #444; }
+    #muzzle-flash { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); width: 80px; height: 80px; background: radial-gradient(circle, #fff, #ff0, transparent); display: none; }
+
+    #instr { position: absolute; top: 10px; left: 10px; font-size: 12px; color: #888; }
   </style>
 </head>
-<body onclick="shoot()">
-  <div id="container">
-    <div id="crosshair">+</div>
+<body onmousedown="shoot()" onkeydown="handleInput(event)">
+
+  <div id="game-wrapper">
+    <div id="instr">WASD to Move | CLICK or SPACE to Shoot</div>
+    
     <canvas id="gameCanvas" width="640" height="340"></canvas>
     
-    <div id="gun-container">
-        <div id="flash"></div>
+    <canvas id="minimap" width="100" height="100"></canvas>
+
+    <div id="gun-box">
+        <div id="muzzle-flash"></div>
         <svg id="gun" viewBox="0 0 100 100">
-            <path d="M35 100 L45 30 L55 30 L65 100" fill="#333" stroke="#000" stroke-width="2"/>
-            <rect x="46" y="25" width="8" height="15" fill="#111" />
+            <path d="M40 100 L45 20 L55 20 L60 100 Z" />
+            <rect x="44" y="15" width="12" height="10" fill="#222" />
         </svg>
     </div>
 
-    <canvas id="minimap" width="120" height="120"></canvas>
-    
     <div id="hud">
-        <span>HEALTH: 100%</span>
-        <span id="ammo-ui">AMMO: 50</span>
-        <span>KILLS: 0</span>
+        <div>HEALTH: <span style="color:lime">100</span></div>
+        <div>AMMO: <span id="ammo-val" style="color:yellow">50</span></div>
+        <div style="font-size: 10px;">CLICK SCREEN TO START</div>
     </div>
   </div>
 
@@ -46,21 +54,19 @@ const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const mCanvas = document.getElementById("minimap");
 const mCtx = mCanvas.getContext("2d");
-const flash = document.getElementById("flash");
-const ammoUI = document.getElementById("ammo-ui");
+const ammoVal = document.getElementById("ammo-val");
+const flash = document.getElementById("muzzle-flash");
 
 const map = [
-  [1,1,1,1,1,1,1,1,1,1,1,1],
-  [1,0,0,0,0,1,0,0,0,0,0,1],
-  [1,0,1,1,0,1,0,1,1,1,0,1],
-  [1,0,0,0,0,0,0,0,0,1,0,1],
-  [1,0,1,1,1,0,1,1,0,0,0,1],
-  [1,0,0,0,0,0,0,1,0,1,0,1],
-  [1,0,1,0,1,1,0,0,0,0,0,1],
-  [1,1,1,1,1,1,1,1,1,1,1,1]
+  [1,1,1,1,1,1,1,1,1,1],
+  [1,0,0,0,0,0,0,0,0,1],
+  [1,0,1,1,0,0,1,1,0,1],
+  [1,0,0,0,0,0,0,0,0,1],
+  [1,0,1,0,0,0,0,1,0,1],
+  [1,1,1,1,1,1,1,1,1,1]
 ];
 
-let player = { x: 2, y: 2, dir: 0, speed: 0.1, rotSpeed: 0.07, ammo: 50 };
+let player = { x: 2, y: 2, dir: 0, speed: 0.1, rotSpeed: 0.08, ammo: 50 };
 const keys = {};
 
 window.onkeydown = (e) => { 
@@ -72,13 +78,13 @@ window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
 function shoot() {
     if (player.ammo > 0) {
         player.ammo--;
-        ammoUI.innerText = `AMMO: ${player.ammo}`;
+        ammoVal.innerText = player.ammo;
         flash.style.display = "block";
-        document.getElementById("gun").style.transform = "translateY(20px) scale(1.1)";
+        document.getElementById("gun").style.transform = "translateY(15px)";
         setTimeout(() => {
             flash.style.display = "none";
-            document.getElementById("gun").style.transform = "translateY(0) scale(1)";
-        }, 100);
+            document.getElementById("gun").style.transform = "translateY(0)";
+        }, 80);
     }
 }
 
@@ -93,30 +99,31 @@ function update() {
 }
 
 function draw() {
-    ctx.fillStyle = "#111"; ctx.fillRect(0, 0, 640, 170);
-    ctx.fillStyle = "#222"; ctx.fillRect(0, 170, 640, 340);
+    // Ceiling/Floor
+    ctx.fillStyle = "#1a1a1a"; ctx.fillRect(0, 0, 640, 170);
+    ctx.fillStyle = "#333"; ctx.fillRect(0, 170, 640, 340);
 
     const fov = Math.PI / 3;
-    const rays = 100;
+    const rays = 80; // Reduced for speed
     for (let i = 0; i < rays; i++) {
         let angle = (player.dir - fov/2) + (i/rays) * fov;
         let dist = 0;
-        while (dist < 15) {
-            dist += 0.05;
+        while (dist < 12) {
+            dist += 0.1;
             if (map[Math.floor(player.y + Math.sin(angle)*dist)][Math.floor(player.x + Math.cos(angle)*dist)] === 1) {
                 let h = 340 / (dist * Math.cos(angle - player.dir));
-                ctx.fillStyle = `rgb(${180 - dist*12}, 0, 0)`;
+                ctx.fillStyle = `rgb(${160 - dist*10}, 0, 0)`;
                 ctx.fillRect(i * (640/rays), 170 - h/2, (640/rays)+1, h);
                 break;
             }
         }
     }
-    // Minimap
-    const s = 120 / map.length;
-    mCtx.fillStyle = "#000"; mCtx.fillRect(0,0,120,120);
+    // Fixed Minimap
+    mCtx.fillStyle = "#000"; mCtx.fillRect(0,0,100,100);
+    const s = 100 / map[0].length;
     for(let y=0; y<map.length; y++) {
         for(let x=0; x<map[y].length; x++) {
-            if(map[y][x] === 1) { mCtx.fillStyle = "#555"; mCtx.fillRect(x*s, y*s, s-1, s-1); }
+            if(map[y][x] === 1) { mCtx.fillStyle = "#444"; mCtx.fillRect(x*s, y*s, s-1, s-1); }
         }
     }
     mCtx.fillStyle = "red"; mCtx.fillRect(player.x*s-2, player.y*s-2, 4, 4);
